@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang=\"en\">
+  <head>
+    <meta charset=\"UTF-8\" />
+    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />
+    <title>Industry & Niche Picker Component</title>
+    <script src=\"https://unpkg.com/react@18/umd/react.production.min.js\"></script>
+    <script src=\"https://unpkg.com/react-dom@18/umd/react-dom.production.min.js\"></script>
+    <script src=\"https://unpkg.com/streamlit-component-lib@2.1.3/dist/streamlit-component-lib.js\"></script>
+    <style>
+      body { margin: 0; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; background: #f9fafb; }
+      #root { padding: 12px; }
+      .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+      .card { border: 1px solid #e5e7eb; border-radius: 12px; padding: 12px; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.05); }
+      .row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+      .button { padding: 6px 10px; border-radius: 10px; border: 1px solid #e5e7eb; background: #fff; cursor: pointer; }
+      .badge { font-size: 12px; padding: 2px 6px; border-radius: 8px; background: #f3f4f6; color: #374151; }
+      .industry { text-align: left; padding: 12px; border-radius: 12px; border: 1px solid #e5e7eb; cursor: pointer; background: #fff; color: #111827; }
+      .industry.active { background: #111827; color: #fff; border-color: #111827; }
+      .muted { font-size: 12px; color: #6b7280; }
+      .checkboxGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    </style>
+  </head>
+  <body>
+    <div id=\"root\"></div>
+    <script>
+      (function() {
+        const e = React.createElement;
+        const { Streamlit, StreamlitComponentBase, withStreamlitConnection } = window.streamlitComponentLib;
+
+        const styles = { headerH1: { fontSize: 18, fontWeight: 600, margin: 0 } };
+
+        class Picker extends StreamlitComponentBase {
+          constructor(props) {
+            super(props);
+            const defSel = this.props.args[\"default_selected\"] || {};
+            this.state = { openIndustries: [], selections: Object.assign({}, defSel) };
+          }
+          componentDidMount() { Streamlit.setFrameHeight(); }
+          componentDidUpdate() { Streamlit.setFrameHeight(); }
+
+          toggleIndustry(industry) {
+            const open = new Set(this.state.openIndustries);
+            if (open.has(industry)) open.delete(industry); else open.add(industry);
+            this.setState({ openIndustries: Array.from(open) });
+          }
+          setAll(industry, niches, value) {
+            const next = Object.assign({}, this.state.selections);
+            next[industry] = value ? niches.slice() : [];
+            this.setState({ selections: next }, () => this.push());
+          }
+          toggleNiche(industry, niche) {
+            const next = Object.assign({}, this.state.selections);
+            const set = new Set(next[industry] || []);
+            if (set.has(niche)) set.delete(niche); else set.add(niche);
+            next[industry] = Array.from(set);
+            this.setState({ selections: next }, () => this.push());
+          }
+          push() { Streamlit.setComponentValue(this.state.selections); }
+
+          render() {
+            const data = this.props.args[\"data\"] || [];
+            const { openIndustries, selections } = this.state;
+            const totalSelected = Object.values(selections).reduce((acc, arr) => acc + (arr ? arr.length : 0), 0);
+            return e(\"div\", null,
+              e(\"div\", { className: \"row\" },
+                e(\"h1\", { style: styles.headerH1 }, \"Industry & Niche Picker\"),
+                e(\"span\", { className: \"badge\" }, totalSelected + \" selected\")
+              ),
+              e(\"div\", { className: \"grid\" },
+                e(\"section\", { className: \"card\" },
+                  e(\"div\", { className: \"row\" }, e(\"strong\", null, \"1) Choose industries\")),
+                  e(\"div\", { style: { display: \"grid\", gridTemplateColumns: \"1fr 1fr\", gap: 8 } },
+                    data.map(row => {
+                      const count = (selections[row.industry] || []).length;
+                      const active = openIndustries.includes(row.industry);
+                      return e(\"button\", {
+                        key: row.industry,
+                        className: \"industry\" + (active ? \" active\" : \"\"),
+                        onClick: () => this.toggleIndustry(row.industry)
+                      },
+                        e(\"div\", { className: \"row\" },
+                          e(\"div\", null,
+                            e(\"div\", { style: { fontWeight: 600 } }, row.industry),
+                            e(\"div\", { className: \"muted\" }, row.niches.length + \" niches\")
+                          ),
+                          e(\"div\", { className: \"badge\", style: { background: active ? \"#fff\" : \"#f3f4f6\", color: active ? \"#111827\" : \"#374151\" } }, count)
+                        )
+                      );
+                    })
+                  )
+                ),
+                e(\"section\", { className: \"card\" },
+                  e(\"div\", { className: \"row\" }, e(\"strong\", null, \"2) Select niches\")),
+                  openIndustries.length === 0
+                    ? e(\"div\", { className: \"muted\" }, \"Choose at least one industry on the left to see its niches here.\")
+                    : e(\"div\", { style: { display: \"flex\", flexDirection: \"column\", gap: 12 } },
+                        openIndustries.map(industry => {
+                          const row = data.find(d => d.industry === industry);
+                          if (!row) return null;
+                          const all = row.niches;
+                          const selected = new Set(selections[industry] || []);
+                          const allChecked = selected.size === all.length;
+                          const noneChecked = selected.size === 0;
+                          return e(\"div\", { key: industry, style: { border: \"1px solid #e5e7eb\", borderRadius: 12, padding: 12 } },
+                            e(\"div\", { className: \"row\" },
+                              e(\"div\", { style: { fontWeight: 600 } }, industry),
+                              e(\"div\", { style: { display: \"flex\", gap: 8 } },
+                                e(\"button\", { className: \"button\", onClick: () => this.setAll(industry, all, true) }, \"Select all\"),
+                                e(\"button\", { className: \"button\", onClick: () => this.setAll(industry, all, false) }, \"Clear\"),
+                                e(\"button\", { className: \"button\", onClick: () => this.toggleIndustry(industry) }, \"Remove industry\")
+                              )
+                            ),
+                            e(\"div\", { style: { display: \"flex\", alignItems: \"center\", gap: 8, fontSize: 12, color: \"#4b5563\", marginBottom: 8 } },
+                              e(\"span\", null, \"Total: \" + all.length), \"•\",
+                              e(\"span\", null, \"Selected: \" + selected.size), \"•\",
+                              e(\"span\", null, \"Status: \" + (allChecked ? \"All\" : (noneChecked ? \"None\" : \"Partial\")))
+                            ),
+                            e(\"div\", { className: \"checkboxGrid\" },
+                              all.map(niche => e(\"label\", { key: industry + \"-\" + niche, style: { display: \"flex\", alignItems: \"center\", gap: 8 } },
+                                e(\"input\", { type: \"checkbox\", checked: selected.has(niche), onChange: () => this.toggleNiche(industry, niche) }),
+                                e(\"span\", { style: { fontSize: 14 } }, niche)
+                              ))
+                            )
+                          );
+                        })
+                      )
+                )
+              )
+            );
+          }
+        }
+
+        const Connected = withStreamlitConnection(Picker);
+        const root = ReactDOM.createRoot(document.getElementById(\"root\"));
+        root.render(e(Connected));
+      })();
+    </script>
+  </body>
+</html>
